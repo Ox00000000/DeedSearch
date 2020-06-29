@@ -1,0 +1,36 @@
+﻿<mah:MetroWindow x:Class="DeedSearch.Login"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mah="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:DeedSearch"
+        mc:Ignorable="d"
+        Title="Login" Height="250" Width="400"
+        ShowMinButton="False" ShowMaxRestoreButton="False" ResizeMode="NoResize">
+    <Grid Width="300" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1*" />
+            <ColumnDefinition Width="1*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition />
+            <RowDefinition />
+            <RowDefinition />
+            <RowDefinition />
+        </Grid.RowDefinitions>
+
+        <TextBlock Name="Error" Grid.ColumnSpan="2" Foreground="Red" FontWeight="Bold" HorizontalAlignment="Center"/>
+
+        <TextBlock Margin="10" Grid.Row="1" Grid.Column="0">Username</TextBlock>
+        <TextBlock Margin="10" Grid.Row="2" Grid.Column="0">Password</TextBlock>
+
+        <TextBox Name="Username" Margin="10" Grid.Row="1" Grid.Column="1"></TextBox>
+        <PasswordBox Name="Password" Margin="10" Grid.Row="2" Grid.Column="1"></PasswordBox>
+
+        <CheckBox Name="SaveUserPass" IsChecked="True" HorizontalAlignment="Right" Grid.Row="3" Grid.ColumnSpan="2">Save Username and Password for session</CheckBox>
+
+        <Button Name="LoginButton" Margin="10" Grid.Row="4" Grid.Column="1" Click="Login_Click" IsDefault="True">Login</Button>
+    </Grid>
+</mah:MetroWindow>
