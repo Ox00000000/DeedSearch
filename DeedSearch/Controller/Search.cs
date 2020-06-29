@@ -21,7 +21,6 @@ namespace DeedSearch
         public static async Task<string> GetSearchItems()
         {
             string retVal = "";
-
             try
             {
                 HttpRequestMessage msg = new HttpRequestMessage(HttpMethod.Get, "https://search.gsccca.org/RealEstate/namesearch.asp");
@@ -137,7 +136,7 @@ namespace DeedSearch
             DataStore.Instance.GetFormContent(partyType).Remove(DataStore.Instance.GetFormContent(partyType).Find(i => i.Key == "rdoEntityName"));
             DataStore.Instance.GetFormContent(partyType).Add(new KeyValuePair<string, string>("rdoEntityName", name));
 
-            // Change search dates if they haven't been added yet
+            // Change search dates if they already exist
             if (DataStore.Instance.GetFormContent(partyType).Exists(i => i.Key == "txtFromDate"))
             {
                 KeyValuePair<string, string> fromDate = DataStore.Instance.GetFormContent(partyType).Find(i => i.Key == "txtFromDate");
@@ -150,29 +149,14 @@ namespace DeedSearch
                 DataStore.Instance.GetFormContent(partyType).Add(new KeyValuePair<string, string>("dtEndDate", toDate.Value));
                 DataStore.Instance.GetFormContent(partyType).Remove(toDate);
             }
-            /*
-            DataStore.Instance.FormContent.Add(new KeyValuePair<string, string>("rdoEntityName", name));
-            KeyValuePair<string, string> fromDate = DataStore.Instance.FormContent.Find(i => i.Key == "txtFromDate");
-            KeyValuePair<string, string> toDate = DataStore.Instance.FormContent.Find(i => i.Key == "txtToDate");
-            DataStore.Instance.FormContent.Add(new KeyValuePair<string, string>("dtStartDate", fromDate.Value));
-            DataStore.Instance.FormContent.Add(new KeyValuePair<string, string>("dtEndDate", toDate.Value));
-            DataStore.Instance.FormContent.Remove(fromDate);
-            DataStore.Instance.FormContent.Remove(toDate);
-            /*
-            DataStore.Instance.FormContent.Add(new KeyValuePair<string, string>("txtCountyName", countyName));
-            KeyValuePair<string, string> countyId = DataStore.Instance.FormContent.Find(i => i.Key == "intCountyID");
-            DataStore.Instance.FormContent.Add(new KeyValuePair<string, string>("bolQueryCounty", countyId.Value == "-1" ? "False" : "True"));
-            */
 
             string retVal = "";
-
             try
             {
 
 
                 HttpRequestMessage msg = new HttpRequestMessage(HttpMethod.Post, "https://search.gsccca.org/RealEstate/nameselected.asp")
                 {
-                    //Content = new FormUrlEncodedContent(DataStore.Instance.FormContent)
                     Content = new FormUrlEncodedContent(DataStore.Instance.GetFormContent(partyType))
                 };
                 AddCookies(msg);
@@ -200,12 +184,10 @@ namespace DeedSearch
             await Task.Delay(REQUEST_DELAY);
 
             string retVal = "";
-
             try
             {
                 HttpRequestMessage msg = new HttpRequestMessage(HttpMethod.Get, "https://search.gsccca.org/RealEstate/" + url)
                 {
-                    //Content = new FormUrlEncodedContent(DataStore.Instance.FormContent)
                     Content = new FormUrlEncodedContent(DataStore.Instance.GetFormContent(partyType))
                 };
 

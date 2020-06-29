@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
+using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -20,6 +21,9 @@ namespace DeedSearch
         private ProgressDialogController RecordsSearchProgress;
         private ProgressDialogController DeedsSearchProgress;
         private bool cancelDeedsSearch;
+
+        private TimeSpan searchTime;
+        private TimeSpan countdownTime;
 
         public SearchWindow()
         {
@@ -139,21 +143,9 @@ namespace DeedSearch
             }
         }
 
-        private void Details_Clicks(object sender, RoutedEventArgs e)
+        private async void Details_Clicks(object sender, RoutedEventArgs e)
         {
             Log.Information("Searching deeds");
-
-            //List<NameSearchResult> selectedGrantors = this.GrantorList.SelectedItems as List<NameSearchResult>;
-            //List<NameSearchResult> selectedGrantees = this.GranteeList.SelectedItems as List<NameSearchResult>;
-
-            //this.GetDetails(selectedGrantors, selectedGrantees);
-            this.GetDetails( );
-        }
-
-        //private async void GetDetails(List<NameSearchResult> selectedGrantors, List<NameSearchResult> selectedGrantees)
-        private async void GetDetails()
-        {
-            //Log.Information($"Search criteria: Grantors {(selectedGrantors != null ? string.Join(", ", selectedGrantors) : "")} Grantees {(selectedGrantees != null ? string.Join(", ", selectedGrantees) : "")}");
 
             this.DeedsSearchProgress = await this.ShowProgressAsync("Searching Deeds", "Calculating time the search may take...");
             this.DeedsSearchProgress.SetIndeterminate();
@@ -187,7 +179,7 @@ namespace DeedSearch
                         login.ShowDialog();
 
                         //this.GetDetails(selectedGrantors, selectedGrantees);
-                        this.GetDetails();
+                        this.Details_Clicks(sender, e);
                     }
                     else
                     {
@@ -220,15 +212,19 @@ namespace DeedSearch
 
             // Calculate time required for seach
             int recordsToSearch = grantorSearchResults.Count + granteeSearchResults.Count;
-            TimeSpan seachTime = TimeSpan.FromMilliseconds(Search.REQUEST_DELAY * recordsToSearch);
+            this.searchTime = TimeSpan.FromMilliseconds(Search.REQUEST_DELAY * recordsToSearch).Add(new TimeSpan(0, 0, 1));
+            this.countdownTime = this.searchTime;
 
             // Update our message display to let the user know how long it may take
-            this.DeedsSearchProgress.SetMessage($"Search will take at least {seachTime.ToString(@"mm\:ss")} minutes");
+            this.DeedsSearchProgress.SetMessage($"Search will take at least {this.searchTime.ToString(@"mm\:ss")} minutes");
             this.DeedsSearchProgress.Maximum = recordsToSearch;
             this.DeedsSearchProgress.SetCancelable(true);
             this.DeedsSearchProgress.Canceled += DeedsSearchProgress_Canceled;
             cancelDeedsSearch = false;
             int recordsCompleted = 0;
+            Timer timer = new Timer(1000);
+            timer.Elapsed += Timer_Elapsed;
+            timer.Start();
 
             // Query each grantor deed
             foreach (SelectedNameResult deedResult in grantorSearchResults)
@@ -299,6 +295,7 @@ namespace DeedSearch
                 this.DeedsSearchProgress.SetProgress(recordsCompleted);
             }
 
+            timer.Stop();
             await this.DeedsSearchProgress.CloseAsync();
 
             this.ResultsList.ItemsSource = DataStore.Instance.DeedResults;
@@ -312,7 +309,16 @@ namespace DeedSearch
             // Move to our final tab to display results
             this.NavigationTab.SelectedIndex = 2;
         }
-        
+
+        private void Timer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            if (this.countdownTime > new TimeSpan(0, 0, 0))
+            {
+                this.countdownTime = this.countdownTime.Subtract(new TimeSpan(0, 0, 1));
+            }
+            this.DeedsSearchProgress.SetMessage($"Search will take at least {this.searchTime.ToString(@"mm\:ss")} minutes\nEstimated completion: {this.countdownTime.ToString(@"mm\:ss")} minutes");
+        }
+
         private void DeedsSearchProgress_Canceled(object sender, EventArgs e)
         {
             this.cancelDeedsSearch = true;
