@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Serilog;
+using System;
 using System.Collections.Generic;
 
 namespace DeedSearch.Data
@@ -37,19 +38,13 @@ namespace DeedSearch.Data
             else
             {
                 Deed d = (Deed) obj;
-                return (Book == d.Book) &&
-                       (Page == d.Page);
-                /*
+
                 return (County == d.County) &&
                        (InstrumentType == d.InstrumentType) &&
                        (DateFiled == d.DateFiled) &&
                        (Time == d.Time) &&
                        (Book == d.Book) &&
-                       (Page == d.Page) &&
-                       (Grantor == d.Grantor) &&
-                       (Grantee == d.Grantee) &&
-                       (ImageUrl == d.ImageUrl);
-                       */
+                       (Page == d.Page);
             }
         }
 
