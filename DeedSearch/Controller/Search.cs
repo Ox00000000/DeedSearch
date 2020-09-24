@@ -24,7 +24,6 @@ namespace DeedSearch
             try
             {
                 HttpRequestMessage msg = new HttpRequestMessage(HttpMethod.Get, "https://search.gsccca.org/RealEstate/namesearch.asp");
-
                 HttpResponseMessage response = await client.SendAsync(msg).ConfigureAwait(false);
                 retVal = await response.Content.ReadAsStringAsync();
 
@@ -38,7 +37,13 @@ namespace DeedSearch
             return retVal;
         }
 
-        public static async Task<string> GetNamesAsync(string searchName, string partyType, DateTime? fromDate, DateTime? toDate, string instrumentType, string county)
+        public static async Task<string> GetNamesAsync(string searchName, 
+                                                       string partyType, 
+                                                       DateTime? fromDate, 
+                                                       DateTime? toDate, 
+                                                       string instrumentType, 
+                                                       string county,
+                                                       int pageNumber)
         {
             DataStore.Instance.SetFormContent(new List<KeyValuePair<string, string>>
             {
@@ -66,7 +71,7 @@ namespace DeedSearch
 
             try
             {
-                HttpRequestMessage msg = new HttpRequestMessage(HttpMethod.Post, "https://search.gsccca.org/RealEstate/names.asp?Type=0")
+                HttpRequestMessage msg = new HttpRequestMessage(HttpMethod.Post, $"https://search.gsccca.org/RealEstate/names.asp?Type=0maxrows=100&page={pageNumber}")
                 {
                     Content = new FormUrlEncodedContent(DataStore.Instance.GetFormContent(partyType))
                 };
@@ -130,7 +135,7 @@ namespace DeedSearch
             return retVal;
         }
 
-        public static async Task<string> GetDeedListAsync(string originalSearch, string name, string countyName, string partyType)
+        public static async Task<string> GetDeedListAsync(string originalSearch, string name, string countyName, string partyType, int pageNumber)
         {
             // Clean up any previous searches
             DataStore.Instance.GetFormContent(partyType).Remove(DataStore.Instance.GetFormContent(partyType).Find(i => i.Key == "rdoEntityName"));
@@ -153,9 +158,7 @@ namespace DeedSearch
             string retVal = "";
             try
             {
-
-
-                HttpRequestMessage msg = new HttpRequestMessage(HttpMethod.Post, "https://search.gsccca.org/RealEstate/nameselected.asp")
+                HttpRequestMessage msg = new HttpRequestMessage(HttpMethod.Post, $"https://search.gsccca.org/RealEstate/nameselected.asp?page={pageNumber}&maxrows=100")
                 {
                     Content = new FormUrlEncodedContent(DataStore.Instance.GetFormContent(partyType))
                 };

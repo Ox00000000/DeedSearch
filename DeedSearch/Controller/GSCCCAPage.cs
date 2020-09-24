@@ -4,6 +4,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace DeedSearch
 {
@@ -46,6 +47,21 @@ namespace DeedSearch
             bool retVal = doc.DocumentNode.SelectSingleNode($"//*[text()[contains(., '{FREE_ACCOUNT_TEXT}')]]") != null;
 
             return retVal;
+        }
+
+        public int GetNumberOfPageResults()
+        {
+            int pages = 1;
+            HtmlNode pageNode = doc.DocumentNode.SelectSingleNode($"//select[@name='choosepage']");
+
+            if (pageNode != null)
+            {
+                HtmlNode lastPageNode = pageNode.ChildNodes.Last(node => node.Name == "option");
+                string pageNumber = lastPageNode.InnerHtml.Trim();
+                Int32.TryParse(pageNumber, out pages);
+            }
+
+            return pages;
         }
 
         public void GetSearchItems()

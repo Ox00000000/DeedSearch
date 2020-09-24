@@ -42,7 +42,6 @@ namespace DeedSearch
             InitializeComponent();
 
             this.ResultsList.SelectionChanged += ResultsList_SelectionChanged;
-            this.GrantorName.Focus();
 
             /*
             HtmlAgilityPack.HtmlDocument doc = new HtmlAgilityPack.HtmlDocument();
@@ -50,9 +49,6 @@ namespace DeedSearch
             GSCCCAPage page = new GSCCCAPage(doc.Text);
             page.DeedResult();
             */
-
-
-            int i = 0;
         }
 
         private async void SearchWindow_Loaded(object sender, RoutedEventArgs e)
@@ -67,6 +63,8 @@ namespace DeedSearch
 
             this.Counties.ItemsSource = DataStore.Instance.Counties;
             this.Counties.SelectedItem = DataStore.Instance.Counties.Find(i => i.Key.ToLower().Contains("all"));
+
+            this.GrantorName.Focus();
         }
 
         private void ResultsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -117,9 +115,10 @@ namespace DeedSearch
 
         private async Task SearchForName(string name, string partyType, DateTime? fromDate, DateTime? toDate, string instrumentType, string county)
         {
-            string result = await Search.GetNamesAsync(name, partyType, fromDate, toDate, instrumentType, county);
+            string result = await Search.GetNamesAsync(name, partyType, fromDate, toDate, instrumentType, county, 1);
 
             GSCCCAPage page = new GSCCCAPage(result);
+            int pageNumbers = page.GetNumberOfPageResults();
 
             if (page.IsLoginRequired())
             {
@@ -135,10 +134,26 @@ namespace DeedSearch
                 if (name == this.GrantorName.Text)
                 {
                     DataStore.Instance.GrantorResults = page.NamesSearch();
+                    
+                    // If there are more pages, parse those too
+                    for (int i = 2; i <= pageNumbers; i++)
+                    {
+                        result = await Search.GetNamesAsync(name, partyType, fromDate, toDate, instrumentType, county, i);
+                        page = new GSCCCAPage(result);
+                        DataStore.Instance.GrantorResults.AddRange(page.NamesSearch());
+                    }
                 }
                 else if (name == this.GranteeName.Text)
                 {
                     DataStore.Instance.GranteeResults = page.NamesSearch();
+
+                    // If there are more pages, parse those too
+                    for (int i = 2; i <= pageNumbers; i++)
+                    {
+                        result = await Search.GetNamesAsync(name, partyType, fromDate, toDate, instrumentType, county, i);
+                        page = new GSCCCAPage(result);
+                        DataStore.Instance.GranteeResults.AddRange(page.NamesSearch());
+                    }
                 }
             }
         }
@@ -168,8 +183,10 @@ namespace DeedSearch
                     string deedListResponse = await Search.GetDeedListAsync(this.GrantorName.Text, 
                                                                             selected.Name, 
                                                                             this.Counties.Text, 
-                                                                            Search.PARTY_TYPE_GRANTOR);
+                                                                            Search.PARTY_TYPE_GRANTOR,
+                                                                            1);
                     GSCCCAPage page = new GSCCCAPage(deedListResponse);
+                    int pageNumbers = page.GetNumberOfPageResults();
 
                     if (page.IsLoginRequired())
                     {
@@ -183,7 +200,20 @@ namespace DeedSearch
                     }
                     else
                     {
+                        // Parse first page of results
                         grantorSearchResults.AddRange(page.DeedSearch());
+
+                        // If there are more pages, parse those too
+                        for (int i = 2; i <= pageNumbers; i++)
+                        {
+                            deedListResponse = await Search.GetDeedListAsync(this.GrantorName.Text,
+                                                                            selected.Name,
+                                                                            this.Counties.Text,
+                                                                            Search.PARTY_TYPE_GRANTOR,
+                                                                            i);
+                            page = new GSCCCAPage(deedListResponse);
+                            grantorSearchResults.AddRange(page.DeedSearch());
+                        }
                     }
                 }
             }
@@ -203,9 +233,27 @@ namespace DeedSearch
                     string deedListResponse = await Search.GetDeedListAsync(this.GranteeName.Text, 
                                                                             selected.Name, 
                                                                             this.Counties.Text, 
-                                                                            Search.PARTY_TYPE_GRANTEE);
+                                                                            Search.PARTY_TYPE_GRANTEE,
+                                                                            1);
                     GSCCCAPage page = new GSCCCAPage(deedListResponse);
+                    int pageNumbers = page.GetNumberOfPageResults();
                     granteeSearchResults.AddRange(page.DeedSearch());
+
+                    // Parse first page of results
+                    granteeSearchResults.AddRange(page.DeedSearch());
+
+                    // If there are more pages, parse those too
+                    for (int i = 2; i <= pageNumbers; i++)
+                    {
+                        deedListResponse = await Search.GetDeedListAsync(this.GranteeName.Text,
+                                                                         selected.Name,
+                                                                         this.Counties.Text,
+                                                                         Search.PARTY_TYPE_GRANTEE,
+                                                                         i);
+
+                        page = new GSCCCAPage(deedListResponse);
+                        granteeSearchResults.AddRange(page.DeedSearch());
+                    }
                 }
             }
             Log.Debug($"Found {granteeSearchResults.Count} total grantee results");
