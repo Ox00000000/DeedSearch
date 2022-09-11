@@ -11,6 +11,7 @@ namespace DeedSearch
         public static readonly int REQUEST_DELAY = 2000;
         public static readonly string PARTY_TYPE_GRANTOR = "1";
         public static readonly string PARTY_TYPE_GRANTEE = "0";
+        public static readonly int MAX_ROWS = 100;
 
         private static HttpClient client = new HttpClient()
         { 
@@ -55,14 +56,14 @@ namespace DeedSearch
                 new KeyValuePair<string, string>("txtSearchName", searchName),
                 new KeyValuePair<string, string>("txtFromDate", fromDate == null ? "" : ((DateTime)fromDate).ToShortDateString()),
                 new KeyValuePair<string, string>("txtToDate", toDate == null ? "" : ((DateTime)toDate).ToShortDateString()),
-                new KeyValuePair<string, string>("MaxRows", "100"),
+                new KeyValuePair<string, string>("MaxRows", MAX_ROWS.ToString()),
                 new KeyValuePair<string, string>("TableType", "1"),
                 new KeyValuePair<string, string>("ShowCaptcha", "False"),
 
                 new KeyValuePair<string, string>("dtSystemEnd", DateTime.Today.AddDays(-1).ToShortDateString()),
                 new KeyValuePair<string, string>("dtSystemStart", "12/31/1871"),
                 new KeyValuePair<string, string>("dtSysGoodFrom", "1/1/1990"),
-                new KeyValuePair<string, string>("dtSysGoodThru", "3/12/2020 4:31 PM"),
+                new KeyValuePair<string, string>("dtSysGoodThru", "6/29/2020"),
                 //new KeyValuePair<string, string>("dtCurrSearchTime", "5/5/2020 8:11:04 PM")
                 new KeyValuePair<string, string>("dtCurrSearchTime", $"{DateTime.UtcNow.ToShortDateString()} {DateTime.UtcNow.ToShortTimeString()}")
             }, partyType);
@@ -71,7 +72,7 @@ namespace DeedSearch
 
             try
             {
-                HttpRequestMessage msg = new HttpRequestMessage(HttpMethod.Post, $"https://search.gsccca.org/RealEstate/names.asp?Type=0maxrows=100&page={pageNumber}")
+                HttpRequestMessage msg = new HttpRequestMessage(HttpMethod.Post, $"https://search.gsccca.org/RealEstate/names.asp?Type=0maxrows={MAX_ROWS}&page={pageNumber}")
                 {
                     Content = new FormUrlEncodedContent(DataStore.Instance.GetFormContent(partyType))
                 };
@@ -137,6 +138,9 @@ namespace DeedSearch
 
         public static async Task<string> GetDeedListAsync(string originalSearch, string name, string countyName, string partyType, int pageNumber)
         {
+            // Delay put in place to not get flagged as a robot
+            await Task.Delay(REQUEST_DELAY);
+
             // Clean up any previous searches
             DataStore.Instance.GetFormContent(partyType).Remove(DataStore.Instance.GetFormContent(partyType).Find(i => i.Key == "rdoEntityName"));
             DataStore.Instance.GetFormContent(partyType).Add(new KeyValuePair<string, string>("rdoEntityName", name));
@@ -148,7 +152,7 @@ namespace DeedSearch
                 DataStore.Instance.GetFormContent(partyType).Add(new KeyValuePair<string, string>("dtStartDate", fromDate.Value));
                 DataStore.Instance.GetFormContent(partyType).Remove(fromDate);
             }
-            if (DataStore.Instance.GetFormContent(partyType).Exists(i => i.Key == "txtFromDate"))
+            if (DataStore.Instance.GetFormContent(partyType).Exists(i => i.Key == "txtToDate"))
             {
                 KeyValuePair<string, string> toDate = DataStore.Instance.GetFormContent(partyType).Find(i => i.Key == "txtToDate");
                 DataStore.Instance.GetFormContent(partyType).Add(new KeyValuePair<string, string>("dtEndDate", toDate.Value));
@@ -158,7 +162,8 @@ namespace DeedSearch
             string retVal = "";
             try
             {
-                HttpRequestMessage msg = new HttpRequestMessage(HttpMethod.Post, $"https://search.gsccca.org/RealEstate/nameselected.asp?page={pageNumber}&maxrows=100")
+                // TODO Parameterize table type
+                HttpRequestMessage msg = new HttpRequestMessage(HttpMethod.Post, $"https://search.gsccca.org/RealEstate/nameselected.asp?page={pageNumber}&maxrows={MAX_ROWS}&TableType=2")
                 {
                     Content = new FormUrlEncodedContent(DataStore.Instance.GetFormContent(partyType))
                 };

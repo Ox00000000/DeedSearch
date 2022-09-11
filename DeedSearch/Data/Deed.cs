@@ -18,13 +18,15 @@ namespace DeedSearch.Data
         public string Time { get; set; }
         public string Book { get; set; }
         public string Page { get; set; }
+        public string Description { get; set; }
         public List<string> Grantor { get; set; }
         public List<string> Grantee { get; set; }
         public string ImageUrl { get; set; }
+        public string DeedPageUrl { get; set; }
 
         public override string ToString()
         {
-            return $"{Book} - {Page}";
+            return $"{Book}/{Page} {County}";
         }
 
         public override bool Equals(Object obj)

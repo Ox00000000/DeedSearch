@@ -91,7 +91,7 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <Button Margin="20" Grid.Row="4" Click="Search_Click" Grid.ColumnSpan="2" IsDefault="{Binding IsSelected, ElementName=SearchTab}">Search</Button>
+                    <Button Margin="20" Grid.Row="4" Click="SearchParty_Click" Grid.ColumnSpan="2" IsDefault="{Binding IsSelected, ElementName=SearchTab}">Search</Button>
                 </Grid>
             </TabItem>
             <TabItem Header="Refine" Name="RefineTab">
@@ -141,7 +141,12 @@
                         </ListView>
                     </DockPanel>
 
-                    <Button Margin="10" Grid.Row="1" Grid.ColumnSpan="2" Click="Details_Clicks" IsDefault="{Binding IsSelected, ElementName=RefineTab}">Get Details</Button>
+                    <!--<Button Margin="10" Grid.Row="1" Grid.ColumnSpan="1" Click="Details_Clicks" IsDefault="{Binding IsSelected, ElementName=RefineTab}">Get Details</Button>-->
+                    <StackPanel Grid.Row="1" Grid.Column="0">
+                        <TextBlock Margin="5" >Search Style</TextBlock>
+                        <ComboBox Name="SearchStyle" Margin="5" DisplayMemberPath="Value" SelectedValuePath="Key" IsEditable="False" />
+                    </StackPanel>
+                    <Button Margin="10" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="1" Click="SearchDeeds_Click" IsDefault="{Binding IsSelected, ElementName=RefineTab}">Search</Button>
                 </Grid>
             </TabItem>
             <TabItem Header="Results">

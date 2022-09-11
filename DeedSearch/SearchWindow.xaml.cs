@@ -4,6 +4,7 @@ using MahApps.Metro.Controls.Dialogs;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Timers;
@@ -48,6 +49,19 @@ namespace DeedSearch
             doc.Load(@"C:\Users\tsmit\Documents\Sample Code\deedResultsFromRequest.html");
             GSCCCAPage page = new GSCCCAPage(doc.Text);
             page.DeedResult();
+            
+
+            HtmlAgilityPack.HtmlDocument doc = new HtmlAgilityPack.HtmlDocument();
+            doc.Load(@"C:\Users\tsmit\Documents\Sample Code\DeedSummaryRegular.html");
+            GSCCCAPage page = new GSCCCAPage(doc.Text);
+            //page.DeedSummary();
+            
+            HtmlAgilityPack.HtmlDocument doc2 = new HtmlAgilityPack.HtmlDocument();
+            doc2.Load(@"C:\Users\tsmit\Documents\Sample Code\DeedSummary1Line.html");
+            GSCCCAPage page2 = new GSCCCAPage(doc2.Text);
+            page2.DeedSummary();
+
+            int i = 0;
             */
         }
 
@@ -64,6 +78,9 @@ namespace DeedSearch
             this.Counties.ItemsSource = DataStore.Instance.Counties;
             this.Counties.SelectedItem = DataStore.Instance.Counties.Find(i => i.Key.ToLower().Contains("all"));
 
+            this.SearchStyle.ItemsSource = DataStore.Instance.SearchStyle;
+            this.SearchStyle.SelectedIndex = 0;
+
             this.GrantorName.Focus();
         }
 
@@ -71,17 +88,20 @@ namespace DeedSearch
         {
             Deed deed = ((sender as ListBox).SelectedItem as Deed);
 
-            this.GrantorResultList.ItemsSource = deed.Grantor;
-            this.GranteeResultList.ItemsSource = deed.Grantee;
-            this.CountyResult.Text = deed.County;
-            this.BookResult.Text = deed.Book;
-            this.PageResult.Text = deed.Page;
-            this.IssueResult.Text = deed.DateFiled;
-            this.TimeResult.Text = deed.Time;
-            this.InstrumentResult.Text = deed.InstrumentType;
+            if (null != deed)
+            {
+                this.GrantorResultList.ItemsSource = deed.Grantor;
+                this.GranteeResultList.ItemsSource = deed.Grantee;
+                this.CountyResult.Text = deed.County;
+                this.BookResult.Text = deed.Book;
+                this.PageResult.Text = deed.Page;
+                this.IssueResult.Text = deed.DateFiled;
+                this.TimeResult.Text = deed.Time;
+                this.InstrumentResult.Text = deed.InstrumentType;
+            }
         }
 
-        private async void Search_Click(object sender, RoutedEventArgs e)
+        private async void SearchParty_Click(object sender, RoutedEventArgs e)
         {
             Log.Information("Starting search");
             Log.Information($"Search criteria: Grantor {this.GrantorName.Text}, Grantee {this.GranteeName.Text}, Date {this.FromDate.SelectedDate} - {this.ToDate.SelectedDate}, Instrument {this.InstrumentType.SelectedValue as string}, County {this.Counties.SelectedValue as string}");
@@ -158,20 +178,21 @@ namespace DeedSearch
             }
         }
 
-        private async void Details_Clicks(object sender, RoutedEventArgs e)
+        private async void SearchDeeds_Click(object sender, RoutedEventArgs e)
         {
-            Log.Information("Searching deeds");
+            KeyValuePair<int, string> searchStyle = (KeyValuePair<int, string>) this.SearchStyle.SelectedItem;
+
+            Log.Information($"Searching deeds with {searchStyle.Value}");
 
             this.DeedsSearchProgress = await this.ShowProgressAsync("Searching Deeds", "Calculating time the search may take...");
             this.DeedsSearchProgress.SetIndeterminate();
 
-            // Clear any previous searchs
-            DataStore.Instance.DeedSearchResults.Clear();
             int errors = 0;
+            int recordsCompleted = 0;
 
             // Check our list of grantor deeds
-            List<SelectedNameResult> grantorSearchResults = new List<SelectedNameResult>();
-
+            List<Deed> grantorSearchResults = new List<Deed>();
+            int grantorNumberOfPages = 0;
             if (null != this.GrantorList.SelectedItems)
             {
                 foreach (NameSearchResult selected in this.GrantorList.SelectedItems)
@@ -180,13 +201,15 @@ namespace DeedSearch
                     DataStore.Instance.SelectedGrantors.Add(selected);
 
                     // Retrieve list of deeds from selected grantor
-                    string deedListResponse = await Search.GetDeedListAsync(this.GrantorName.Text, 
-                                                                            selected.Name, 
-                                                                            this.Counties.Text, 
+                    string deedListResponse = await Search.GetDeedListAsync(this.GrantorName.Text,
+                                                                            selected.Name,
+                                                                            this.Counties.Text,
                                                                             Search.PARTY_TYPE_GRANTOR,
                                                                             1);
                     GSCCCAPage page = new GSCCCAPage(deedListResponse);
                     int pageNumbers = page.GetNumberOfPageResults();
+                    selected.NumberOfPages = pageNumbers;
+                    grantorNumberOfPages += pageNumbers;
 
                     if (page.IsLoginRequired())
                     {
@@ -195,87 +218,149 @@ namespace DeedSearch
                         login.WindowStartupLocation = WindowStartupLocation.CenterOwner;
                         login.ShowDialog();
 
-                        //this.GetDetails(selectedGrantors, selectedGrantees);
-                        this.Details_Clicks(sender, e);
+                        this.SearchDeeds_Click(sender, e);
                     }
                     else
                     {
                         // Parse first page of results
-                        grantorSearchResults.AddRange(page.DeedSearch());
-
-                        // If there are more pages, parse those too
-                        for (int i = 2; i <= pageNumbers; i++)
-                        {
-                            deedListResponse = await Search.GetDeedListAsync(this.GrantorName.Text,
-                                                                            selected.Name,
-                                                                            this.Counties.Text,
-                                                                            Search.PARTY_TYPE_GRANTOR,
-                                                                            i);
-                            page = new GSCCCAPage(deedListResponse);
-                            grantorSearchResults.AddRange(page.DeedSearch());
-                        }
+                        grantorSearchResults.AddRange(page.DeedSummary());
+                        recordsCompleted++;
                     }
                 }
             }
-            Log.Debug($"Found {grantorSearchResults.Count} total grantor results");
-
+            
             // Check our list of grantee deeds
-            List<SelectedNameResult> granteeSearchResults = new List<SelectedNameResult>();
-
+            List<Deed> granteeSearchResults = new List<Deed>();
+            int granteeNumberOfPages = 0;
             if (null != this.GranteeList.SelectedItems)
             {
                 foreach (NameSearchResult selected in this.GranteeList.SelectedItems)
                 {
-                    Log.Information($"Search criteria: Grantor {selected}");
+                    Log.Information($"Search criteria: Grantee {selected}");
                     DataStore.Instance.SelectedGrantees.Add(selected);
 
-                    // Retrieve list of deeds from selected grantor
-                    string deedListResponse = await Search.GetDeedListAsync(this.GranteeName.Text, 
-                                                                            selected.Name, 
-                                                                            this.Counties.Text, 
+                    // Retrieve list of deeds from selected grantee
+                    string deedListResponse = await Search.GetDeedListAsync(this.GranteeName.Text,
+                                                                            selected.Name,
+                                                                            this.Counties.Text,
                                                                             Search.PARTY_TYPE_GRANTEE,
                                                                             1);
                     GSCCCAPage page = new GSCCCAPage(deedListResponse);
                     int pageNumbers = page.GetNumberOfPageResults();
-                    granteeSearchResults.AddRange(page.DeedSearch());
+                    selected.NumberOfPages = pageNumbers;
+                    granteeNumberOfPages += pageNumbers;
 
                     // Parse first page of results
-                    granteeSearchResults.AddRange(page.DeedSearch());
-
-                    // If there are more pages, parse those too
-                    for (int i = 2; i <= pageNumbers; i++)
-                    {
-                        deedListResponse = await Search.GetDeedListAsync(this.GranteeName.Text,
-                                                                         selected.Name,
-                                                                         this.Counties.Text,
-                                                                         Search.PARTY_TYPE_GRANTEE,
-                                                                         i);
-
-                        page = new GSCCCAPage(deedListResponse);
-                        granteeSearchResults.AddRange(page.DeedSearch());
-                    }
+                    granteeSearchResults.AddRange(page.DeedSummary());
+                    recordsCompleted++;
                 }
             }
-            Log.Debug($"Found {granteeSearchResults.Count} total grantee results");
 
-            // Calculate time required for seach
-            int recordsToSearch = grantorSearchResults.Count + granteeSearchResults.Count;
-            this.searchTime = TimeSpan.FromMilliseconds(Search.REQUEST_DELAY * recordsToSearch).Add(new TimeSpan(0, 0, 1));
+            // Estimate time required for seach
+            int pagesToSearch = grantorNumberOfPages + granteeNumberOfPages;
+            int recordsToSearch = 0;
+            recordsToSearch += grantorNumberOfPages > 1 ? grantorNumberOfPages * Search.MAX_ROWS : grantorSearchResults.Count;
+            recordsToSearch += granteeNumberOfPages > 1 ? granteeNumberOfPages * Search.MAX_ROWS : granteeSearchResults.Count;
+            int estimatedRecordsToSearch = 0;
+            switch (searchStyle.Key)
+            {
+                case 0:
+                    // Quick search only checks the summary pages
+                    estimatedRecordsToSearch = pagesToSearch;
+                    break;
+                case 1:
+                    // Deep search looks at each record
+                    estimatedRecordsToSearch = recordsToSearch;
+                    break;
+                case 2:
+                    break;
+            }
+
+            // Calculate search time with our artificial delay
+            this.searchTime = TimeSpan.FromMilliseconds(Search.REQUEST_DELAY * estimatedRecordsToSearch).Add(new TimeSpan(0, 0, 1));
             this.countdownTime = this.searchTime;
 
             // Update our message display to let the user know how long it may take
             this.DeedsSearchProgress.SetMessage($"Search will take at least {this.searchTime.ToString(@"mm\:ss")} minutes");
-            this.DeedsSearchProgress.Maximum = recordsToSearch;
+            this.DeedsSearchProgress.Maximum = estimatedRecordsToSearch;
             this.DeedsSearchProgress.SetCancelable(true);
             this.DeedsSearchProgress.Canceled += DeedsSearchProgress_Canceled;
+            this.DeedsSearchProgress.SetProgress(recordsCompleted);
             cancelDeedsSearch = false;
-            int recordsCompleted = 0;
+
+            // Start an update timer
             Timer timer = new Timer(1000);
             timer.Elapsed += Timer_Elapsed;
             timer.Start();
 
-            // Query each grantor deed
-            foreach (SelectedNameResult deedResult in grantorSearchResults)
+            // Check additional pages of deed summaries
+            if (null != this.GrantorList.SelectedItems)
+            {
+                grantorSearchResults.AddRange(await this.queryDeedSummaryPageAsync(this.GrantorList.SelectedItems.Cast<NameSearchResult>().ToList(),
+                                                                                   this.GrantorName.Text,
+                                                                                   Search.PARTY_TYPE_GRANTOR,
+                                                                                   recordsCompleted));
+            }
+            Log.Debug($"Found {grantorSearchResults.Count} total grantor results");
+
+            // Check additional pages of deed summaries
+            if (null != this.GranteeList.SelectedItems)
+            {
+                granteeSearchResults.AddRange(await this.queryDeedSummaryPageAsync(this.GranteeList.SelectedItems.Cast<NameSearchResult>().ToList(),
+                                                                                   this.GranteeName.Text,
+                                                                                   Search.PARTY_TYPE_GRANTEE,
+                                                                                   recordsCompleted));
+            }
+            Log.Debug($"Found {granteeSearchResults.Count} total grantee results");
+
+            recordsToSearch = grantorSearchResults.Count + granteeSearchResults.Count;
+
+            switch (searchStyle.Key)
+            {
+                case 0:
+                    List<Deed> results = DataStore.Instance.QuickHitCheck(grantorSearchResults, granteeSearchResults);
+                    
+                    await this.queryDeedPageAsync(results, Search.PARTY_TYPE_GRANTOR, recordsCompleted, errors);
+
+                    this.ResultsList.ItemsSource = DataStore.Instance.DeedHitResults;
+                    break;
+                case 1:
+                    this.DeedsSearchProgress.Maximum = grantorSearchResults.Count + 
+                                                       granteeSearchResults.Count + 
+                                                       grantorNumberOfPages + 
+                                                       granteeNumberOfPages;
+                    // Query each deed
+                    await this.queryDeedPageAsync(grantorSearchResults, Search.PARTY_TYPE_GRANTOR, recordsCompleted, errors);
+                    await this.queryDeedPageAsync(granteeSearchResults, Search.PARTY_TYPE_GRANTEE, recordsCompleted, errors);
+
+                    this.ResultsList.ItemsSource = DataStore.Instance.DeedHitResults;
+                    break;
+                case 2:
+                    break;
+            }
+
+            // Search completed
+            timer.Stop();
+            await this.DeedsSearchProgress.CloseAsync();
+
+            this.SearchesTextBlock.Text = $"Searched: {recordsToSearch}";
+            this.HitsTextBlock.Text = $"Hits: {DataStore.Instance.DeedHitResults.Count}";
+            this.ErrorstextBlock.Text = $"Errors: {errors}";
+
+            Log.Information($"Estimated: {estimatedRecordsToSearch}, To Search: {recordsToSearch}, Pages Searched: {recordsCompleted}, Hits: {DataStore.Instance.DeedHitResults.Count}, Errors: {errors}");
+
+            // Move to our final tab to display results
+            this.NavigationTab.SelectedIndex = 2;
+        }
+
+        private async Task<List<Deed>> queryDeedSummaryPageAsync(List<NameSearchResult> selectedItems, 
+                                                                 string originalSearch,
+                                                                 string searchType,
+                                                                 int recordsCompleted)
+        {
+            List<Deed> retVal = new List<Deed>();
+            
+            foreach (NameSearchResult selected in selectedItems)
             {
                 if (cancelDeedsSearch)
                 {
@@ -283,7 +368,37 @@ namespace DeedSearch
                     break;
                 }
 
-                string deedResponse = await Search.GetDeedAsync(deedResult.DeedUrl, Search.PARTY_TYPE_GRANTOR);
+                // If there are more pages, parse those too
+                for (int i = 2; i <= selected.NumberOfPages; i++)
+                {
+                    string deedListResponse = await Search.GetDeedListAsync(originalSearch,
+                                                                            selected.Name,
+                                                                            this.Counties.Text,
+                                                                            searchType,
+                                                                            i);
+
+                    GSCCCAPage page = new GSCCCAPage(deedListResponse);
+                    retVal.AddRange(page.DeedSummary());
+                    recordsCompleted++;
+                    this.DeedsSearchProgress.SetProgress(recordsCompleted);
+                }
+            }
+
+            return retVal;
+        }
+
+        private async Task queryDeedPageAsync(List<Deed> deeds, string searchType, int recordsCompleted, int errors)
+        {
+            // Query each deed details page
+            foreach (Deed deedResult in deeds)
+            {
+                if (cancelDeedsSearch)
+                {
+                    Log.Information("Deed search cancelled");
+                    break;
+                }
+
+                string deedResponse = await Search.GetDeedAsync(deedResult.DeedPageUrl, searchType);
                 //DataStore.Instance.writeToFile(deedResponse);
                 GSCCCAPage deedPage = new GSCCCAPage(deedResponse);
 
@@ -292,8 +407,6 @@ namespace DeedSearch
                     !deedPage.IsFreeAccount())
                 {
                     Deed deed = deedPage.DeedResult();
-                    // TODO Remove? DataStore.Instance.DeedSearchResults.Add(deed);
-
                     DataStore.Instance.CheckHit(deed);
                 }
                 else
@@ -302,60 +415,12 @@ namespace DeedSearch
                     this.Notification.Text = $"Failed retrieving {errors} deeds";
                     this.Notification.Foreground = Brushes.Red;
 
-                    Log.Warning($"Failed retrieving deed at {deedResult.DeedUrl}");
+                    Log.Warning($"Failed retrieving deed at {deedResult.DeedPageUrl}");
                 }
 
                 recordsCompleted++;
                 this.DeedsSearchProgress.SetProgress(recordsCompleted);
             }
-
-            // Query each grantee deed
-            foreach (SelectedNameResult deedResult in granteeSearchResults)
-            {
-                if (cancelDeedsSearch)
-                {
-                    Log.Information("Deed search cancelled");
-                    break;
-                }
-
-                string deedResponse = await Search.GetDeedAsync(deedResult.DeedUrl, Search.PARTY_TYPE_GRANTEE);
-                GSCCCAPage deedPage = new GSCCCAPage(deedResponse);
-
-                // Check if we're been caught and flagged as non-human or a free account
-                if (!deedPage.IsRecaptchaPresent() &&
-                    !deedPage.IsFreeAccount())
-                {
-                    Deed deed = deedPage.DeedResult();
-                    DataStore.Instance.DeedSearchResults.Add(deed);
-
-                    DataStore.Instance.CheckHit(deed);
-                }
-                else
-                {
-                    errors++;
-                    this.Notification.Text = $"Failed retrieving {errors} deeds";
-                    this.Notification.Foreground = Brushes.Red;
-
-                    Log.Warning($"Failed retrieving deed at {deedResult.DeedUrl}");
-                }
-
-                recordsCompleted++;
-                this.DeedsSearchProgress.SetProgress(recordsCompleted);
-            }
-
-            timer.Stop();
-            await this.DeedsSearchProgress.CloseAsync();
-
-            this.ResultsList.ItemsSource = DataStore.Instance.DeedResults;
-
-            this.SearchesTextBlock.Text = $"Searched: {recordsToSearch}";
-            this.HitsTextBlock.Text = $"Hits: {DataStore.Instance.DeedResults.Count}";
-            this.ErrorstextBlock.Text = $"Errors: {errors}";
-
-            Log.Information($"Searched: {recordsToSearch}, Hits: {DataStore.Instance.DeedResults.Count}, Errors: {errors}");
-
-            // Move to our final tab to display results
-            this.NavigationTab.SelectedIndex = 2;
         }
 
         private void Timer_Elapsed(object sender, ElapsedEventArgs e)

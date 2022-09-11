@@ -121,37 +121,6 @@ namespace DeedSearch
             return retVal;
         }
 
-        public List<SelectedNameResult> DeedSearch()
-        {
-            List<SelectedNameResult> retVal = new List<SelectedNameResult>();
-
-            HtmlNodeCollection linkNodes = doc.DocumentNode.SelectNodes("//a[@href]");
-            if (linkNodes != null)
-            {
-                foreach (HtmlNode link in linkNodes)
-                {
-                    if (link.InnerHtml.Contains("img"))
-                    {
-                        HtmlAttribute url = link.Attributes["href"];
-
-                        if (!url.Value.Contains("explanation"))
-                        {
-                            SelectedNameResult deedResult = new SelectedNameResult();
-
-                            string trimUrl = url.Value.Substring(url.Value.IndexOf("'") + 1);
-                            trimUrl = trimUrl.Remove(trimUrl.IndexOf("'"));
-                            deedResult.DeedUrl = trimUrl;
-
-                            retVal.Add(deedResult);
-                        }
-                    }
-                }
-            }
-            Log.Debug($"Search resulted in {retVal.Count} deeds");
-
-            return retVal;
-        }
-
         public Deed DeedResult()
         {
             Deed retVal = new Deed();
@@ -271,6 +240,55 @@ namespace DeedSearch
                 retVal = match.Groups[1].Value.Trim().Replace("\"", "").Replace(@"\", "").Replace(@";", "");
             }
             return retVal;
+        }
+
+        public List<Deed> DeedSummary()
+        {
+            List<Deed> deeds = new List<Deed>();
+
+            HtmlNode tableNode = doc.DocumentNode.SelectSingleNode("//table[@class='table_borders']");
+
+            if (tableNode != null)
+            {
+                HtmlNodeCollection tableRowNodes = tableNode.SelectNodes(".//tr");
+                IEnumerable<HtmlNode> rows = tableRowNodes.Where(r => !string.IsNullOrWhiteSpace(r.InnerText));
+
+                foreach (HtmlNode row in rows)
+                {
+                    // Skip the header row
+                    if (row == rows.First())
+                    {
+                        continue;
+                    }
+
+                    HtmlNodeCollection details = row.SelectNodes(".//td");
+                    HtmlNode link = details[0].SelectSingleNode(".//a");
+                    string trimUrl = "";
+                    if (null != link && link.OuterHtml.Contains("href"))
+                    {
+                        HtmlAttribute url = link.Attributes["href"];
+                        trimUrl = url.Value.Substring(url.Value.IndexOf("'") + 1);
+                        trimUrl = trimUrl.Remove(trimUrl.IndexOf("'"));
+                    }
+
+                    if (details.Count > 1 && !string.IsNullOrWhiteSpace(trimUrl))
+                    {
+                        Deed partialDeed = new Deed()
+                        {
+                            DeedPageUrl = trimUrl,
+                            County = details[1].InnerText,
+                            InstrumentType = details[2].InnerText,
+                            DateFiled = details[3].InnerText,
+                            Book = details[4].InnerText.Trim(),
+                            Page = details[5].InnerText.Trim(),
+                            // TODO Add Description Not Warranted
+                        };
+                        deeds.Add(partialDeed);
+                    }
+                }
+            }
+
+            return deeds;
         }
     }
 }

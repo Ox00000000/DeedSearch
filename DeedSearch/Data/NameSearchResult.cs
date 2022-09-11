@@ -6,6 +6,8 @@
 
         public int Occurs { get; set; }
 
+        public int NumberOfPages { get; set; }
+
         public override string ToString()
         {
             return this.Name;
